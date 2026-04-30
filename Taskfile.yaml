@@ -1,0 +1,17 @@
+version: 3
+
+tasks:
+  go-fmt:
+    desc: "Format Go code"
+    cmds: 
+     - go fmt ./...
+  
+  user-build:
+    desc: "Build the user service"
+    cmds:
+      - go build -o bin/user-app cmd/user/main.go
+  
+  user-run:
+    desc: "Run the user service"
+    cmds:
+      - go run cmd/user/main.go
