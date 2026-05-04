@@ -52,9 +52,9 @@ jobs:
           go build -o build/user-app ./cmd/user
 
       - name: Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v5
         with:
           name: user-app
           path: build/user-app
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 3
