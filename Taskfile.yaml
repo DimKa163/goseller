@@ -1,17 +1,41 @@
 version: 3
 
+dotenv:
+  - .env
+
 tasks:
   go-fmt:
     desc: "Format Go code"
-    cmds: 
-     - go fmt ./...
-  
+    cmds:
+      - go fmt ./...
+
+  go-test:
+    desc: "Run tests"
+    cmds:
+      - go test -v ./...
+
+  tidy:
+    desc: "Run gofmt and goimports"
+    cmds:
+      - go mod tidy
+
   user-build:
     desc: "Build the user service"
     cmds:
-      - go build -o bin/user-app cmd/user/main.go
-  
+      - go build -o build/user-app cmd/user/main.go
+
   user-run:
     desc: "Run the user service"
     cmds:
       - go run cmd/user/main.go
+
+  user-mocks:
+    desc: "Generate mocks for user repository"
+    cmds:
+      - mockgen -source=internal/user/domain/user.go
+        -destination=internal/user/mocks/repository_mock.go -package=mocks
+
+  user-migrate:
+    desc: "Run database migrations for user service"
+    cmds:
+      - migrate create -ext sql -dir ./internal/user/migrations {{.CLI_ARGS}}
