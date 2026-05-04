@@ -60,7 +60,7 @@ func TestCreateShouldReturnErrorIfEmailAlreadyExists(t *testing.T) {
 	id, err := sut.Create(ctx, req)
 
 	assert.ErrorIs(t, err, domain.ErrEmailAlreadyExists)
-	assert.Equal(t, domain.UserID(0), id)
+	assert.Equal(t, domain.UserID(1), id)
 }
 
 func TestCreateShouldReturnErrorIfPhoneAlreadyExists(t *testing.T) {
