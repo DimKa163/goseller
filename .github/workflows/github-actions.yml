@@ -6,10 +6,14 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-go
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
@@ -20,6 +24,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-go
 
       - name: Run tests
@@ -29,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ lint, test ]
     steps:
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-go
 
       - name: Build user-app
