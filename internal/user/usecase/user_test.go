@@ -26,8 +26,6 @@ func TestCreateShouldBeSuccessful(t *testing.T) {
 		Phone: phone,
 	}
 	mockRepo := mocks.NewMockUserRepository(ctrl)
-	mockRepo.EXPECT().GetCountByEmail(ctx, gomock.Any()).Return(int64(0), nil).Times(1)
-	mockRepo.EXPECT().GetCountByPhone(ctx, gomock.Any()).Return(int64(0), nil).Times(1)
 	mockRepo.EXPECT().Create(ctx, gomock.Any()).Return(domain.UserID(1), nil).Times(1)
 	logger := zap.NewNop()
 	sut := NewUser(mockRepo, logger)
@@ -51,16 +49,14 @@ func TestCreateShouldReturnErrorIfEmailAlreadyExists(t *testing.T) {
 		Phone: phone,
 	}
 	mockRepo := mocks.NewMockUserRepository(ctrl)
-	mockRepo.EXPECT().GetCountByEmail(ctx, gomock.Any()).Return(int64(1), nil).AnyTimes()
-	mockRepo.EXPECT().GetCountByPhone(ctx, gomock.Any()).Return(int64(0), nil).AnyTimes()
-	mockRepo.EXPECT().Create(ctx, gomock.Any()).Return(domain.UserID(1), nil).Times(0)
+	mockRepo.EXPECT().Create(ctx, gomock.Any()).Return(domain.UserID(-1), dberror.ErrDuplicateKey).Times(1)
 	logger := zap.NewNop()
 	sut := NewUser(mockRepo, logger)
 
 	id, err := sut.Create(ctx, req)
 
-	assert.ErrorIs(t, err, domain.ErrEmailAlreadyExists)
-	assert.Equal(t, domain.UserID(0), id)
+	assert.ErrorIs(t, err, dberror.ErrDuplicateKey)
+	assert.Equal(t, domain.UserID(-1), id)
 }
 
 func TestCreateShouldReturnErrorIfPhoneAlreadyExists(t *testing.T) {
@@ -76,16 +72,14 @@ func TestCreateShouldReturnErrorIfPhoneAlreadyExists(t *testing.T) {
 		Phone: phone,
 	}
 	mockRepo := mocks.NewMockUserRepository(ctrl)
-	mockRepo.EXPECT().GetCountByEmail(ctx, gomock.Any()).Return(int64(0), nil).AnyTimes()
-	mockRepo.EXPECT().GetCountByPhone(ctx, phone).Return(int64(1), nil).AnyTimes()
-	mockRepo.EXPECT().Create(ctx, gomock.Any()).Return(domain.UserID(1), nil).Times(0)
+	mockRepo.EXPECT().Create(ctx, gomock.Any()).Return(domain.UserID(-1), dberror.ErrDuplicateKey).Times(1)
 	logger := zap.NewNop()
 	sut := NewUser(mockRepo, logger)
 
 	id, err := sut.Create(ctx, req)
 
-	assert.ErrorIs(t, err, domain.ErrPhoneAlreadyExists)
-	assert.Equal(t, domain.UserID(0), id)
+	assert.ErrorIs(t, err, dberror.ErrDuplicateKey)
+	assert.Equal(t, domain.UserID(-1), id)
 }
 
 func TestUpdateShouldBeSuccessful(t *testing.T) {
@@ -111,8 +105,6 @@ func TestUpdateShouldBeSuccessful(t *testing.T) {
 	}
 	mockRepo := mocks.NewMockUserRepository(ctrl)
 	mockRepo.EXPECT().GetByID(ctx, id).Return(user, nil).Times(1)
-	mockRepo.EXPECT().GetCountByEmail(ctx, req.Email).Return(int64(0), nil).Times(1)
-	mockRepo.EXPECT().GetCountByPhone(ctx, req.Phone).Return(int64(0), nil).Times(1)
 	mockRepo.EXPECT().Update(ctx, gomock.Any()).Return(&domain.User{
 		ID:        id,
 		CreatedAt: user.CreatedAt,
@@ -147,8 +139,6 @@ func TestUpdateShouldReturnErrorIfUserNotFound(t *testing.T) {
 	}
 	mockRepo := mocks.NewMockUserRepository(ctrl)
 	mockRepo.EXPECT().GetByID(ctx, id).Return(nil, dberror.ErrNoRows).Times(1)
-	mockRepo.EXPECT().GetCountByEmail(ctx, req.Email).Return(int64(0), nil).Times(0)
-	mockRepo.EXPECT().GetCountByPhone(ctx, req.Phone).Return(int64(0), nil).Times(0)
 	mockRepo.EXPECT().Update(ctx, gomock.Any()).Return(&domain.User{
 		ID:        id,
 		CreatedAt: time.Now().Add(time.Duration(-50 * time.Hour)),
@@ -189,22 +179,13 @@ func TestUpdateShouldReturnErrorIfEmailAlreadyExists(t *testing.T) {
 	}
 	mockRepo := mocks.NewMockUserRepository(ctrl)
 	mockRepo.EXPECT().GetByID(ctx, id).Return(user, nil).Times(1)
-	mockRepo.EXPECT().GetCountByEmail(ctx, req.Email).Return(int64(1), nil).AnyTimes()
-	mockRepo.EXPECT().GetCountByPhone(ctx, req.Phone).Return(int64(0), nil).AnyTimes()
-	mockRepo.EXPECT().Update(ctx, gomock.Any()).Return(&domain.User{
-		ID:        id,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: time.Now(),
-		Name:      name,
-		Email:     email,
-		Phone:     phone,
-	}, nil).Times(0)
+	mockRepo.EXPECT().Update(ctx, gomock.Any()).Return(nil, dberror.ErrDuplicateKey).Times(1)
 	logger := zap.NewNop()
 	sut := NewUser(mockRepo, logger)
 
 	r, err := sut.Update(ctx, id, req)
 
-	assert.ErrorIs(t, err, domain.ErrEmailAlreadyExists)
+	assert.ErrorIs(t, err, dberror.ErrDuplicateKey)
 	assert.Nil(t, r)
 }
 
@@ -231,22 +212,13 @@ func TestUpdateShouldReturnErrorIfPhoneAlreadyExists(t *testing.T) {
 	}
 	mockRepo := mocks.NewMockUserRepository(ctrl)
 	mockRepo.EXPECT().GetByID(ctx, id).Return(user, nil).Times(1)
-	mockRepo.EXPECT().GetCountByEmail(ctx, req.Email).Return(int64(0), nil).AnyTimes()
-	mockRepo.EXPECT().GetCountByPhone(ctx, req.Phone).Return(int64(1), nil).AnyTimes()
-	mockRepo.EXPECT().Update(ctx, gomock.Any()).Return(&domain.User{
-		ID:        id,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: time.Now(),
-		Name:      name,
-		Email:     email,
-		Phone:     phone,
-	}, nil).Times(0)
+	mockRepo.EXPECT().Update(ctx, gomock.Any()).Return(nil, dberror.ErrDuplicateKey).Times(1)
 	logger := zap.NewNop()
 	sut := NewUser(mockRepo, logger)
 
 	r, err := sut.Update(ctx, id, req)
 
-	assert.ErrorIs(t, err, domain.ErrPhoneAlreadyExists)
+	assert.ErrorIs(t, err, dberror.ErrDuplicateKey)
 	assert.Nil(t, r)
 }
 

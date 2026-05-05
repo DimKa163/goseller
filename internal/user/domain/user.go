@@ -12,7 +12,7 @@ type UserID int64
 func NewUserID(s string) (UserID, error) {
 	id, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		return -1, fmt.Errorf("invalid user ID: %w", err)
+		return -1, fmt.Errorf("%w: %w", ErrInvalidUserID, err)
 	}
 	return UserID(id), nil
 }

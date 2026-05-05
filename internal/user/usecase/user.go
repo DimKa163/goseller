@@ -48,12 +48,6 @@ func (u *User) GetByID(ctx context.Context, id domain.UserID) (*domain.User, err
 func (u *User) Create(ctx context.Context, req *CreateUserRequest) (domain.UserID, error) {
 	var usID domain.UserID
 	var err error
-	if err = u.checkDoubleEmail(ctx, req.Email); err != nil {
-		return usID, err
-	}
-	if err = u.checkDoublePhone(ctx, req.Phone); err != nil {
-		return usID, err
-	}
 	user := domain.CreateNewUser(req.Name, req.Email, req.Phone)
 	usID, err = u.userRepository.Create(ctx, user)
 	if err != nil {
@@ -72,16 +66,6 @@ func (u *User) Update(ctx context.Context, id domain.UserID, req *UpdateUserRequ
 			return nil, fmt.Errorf("%w; id: %d", domain.ErrUserNotFound, id)
 		}
 		return nil, err
-	}
-	if req.Email != user.Email {
-		if err = u.checkDoubleEmail(ctx, req.Email); err != nil {
-			return nil, err
-		}
-	}
-	if req.Phone != user.Phone {
-		if err = u.checkDoublePhone(ctx, req.Phone); err != nil {
-			return nil, err
-		}
 	}
 	user.Update(req.Name, req.Email, req.Phone)
 	if user, err = u.userRepository.Update(ctx, user); err != nil {
@@ -103,28 +87,6 @@ func (u *User) Delete(ctx context.Context, id domain.UserID) error {
 	user.Deactivate()
 	if err = u.userRepository.Delete(ctx, user.ID); err != nil {
 		return err
-	}
-	return nil
-}
-
-func (u *User) checkDoublePhone(ctx context.Context, phone domain.Phone) error {
-	usCount, err := u.userRepository.GetCountByPhone(ctx, phone)
-	if err != nil {
-		return err
-	}
-	if usCount > 0 {
-		return domain.ErrPhoneAlreadyExists
-	}
-	return nil
-}
-
-func (u *User) checkDoubleEmail(ctx context.Context, email domain.Email) error {
-	usCount, err := u.userRepository.GetCountByEmail(ctx, email)
-	if err != nil {
-		return err
-	}
-	if usCount > 0 {
-		return domain.ErrEmailAlreadyExists
 	}
 	return nil
 }

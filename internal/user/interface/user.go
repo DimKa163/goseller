@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/DimKa163/goseller/internal/dberror"
 	"github.com/DimKa163/goseller/internal/shared"
 	"github.com/DimKa163/goseller/internal/transport"
 	"github.com/DimKa163/goseller/internal/user/domain"
@@ -58,7 +59,9 @@ func (c *UserController) CreateUser(ctx *gin.Context) {
 		return
 	}
 	ctx.Header("Location", "/user/"+id.String())
-	ctx.Status(http.StatusCreated)
+	ctx.JSON(http.StatusCreated, gin.H{
+		"id": id,
+	})
 }
 
 func (c *UserController) UpdateUser(ctx *gin.Context) {
@@ -141,6 +144,14 @@ func (c *UserController) handleError(ctx *gin.Context, err error) {
 			Message: err.Error(),
 			Details: []*transport.ErrorDetail{},
 			Code:    int(shared.ErrorCodeResourceNotFound),
+		}})
+		return
+	}
+	if errors.Is(err, dberror.ErrDuplicateKey) {
+		ctx.JSON(http.StatusConflict, &transport.ErrorResponse{Error: &transport.Error{
+			Message: err.Error(),
+			Details: []*transport.ErrorDetail{},
+			Code:    int(shared.ErrorCodeResourceAlreadyExists),
 		}})
 		return
 	}

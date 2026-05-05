@@ -3,10 +3,11 @@ package infrastructure
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/DimKa163/goseller/internal/dberror"
 	"github.com/DimKa163/goseller/internal/user/domain"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -33,7 +34,7 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User) (domain.
 	var id domain.UserID
 	err := r.db.QueryRow(ctx, createUserQuery, user.Name, user.Email, user.Phone).Scan(&id)
 	if err != nil {
-		return -1, err
+		return -1, handleError(err)
 	}
 	return id, nil
 }
@@ -42,10 +43,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id domain.UserID) (*domain
 	var user domain.User
 	err := r.db.QueryRow(ctx, getUserByIDQuery, id).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.Name, &user.Email, &user.Phone, &user.IsActive)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, dberror.ErrNoRows
-		}
-		return nil, err
+		return nil, handleError(err)
 	}
 	return &user, nil
 }
@@ -54,10 +52,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email domain.Email) (*d
 	var user domain.User
 	err := r.db.QueryRow(ctx, getUserByEmailQuery, email).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.Name, &user.Email, &user.Phone, &user.IsActive)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, dberror.ErrNoRows
-		}
-		return nil, err
+		return nil, handleError(err)
 	}
 	return &user, nil
 }
@@ -66,17 +61,14 @@ func (r *UserRepository) GetByPhone(ctx context.Context, phone domain.Phone) (*d
 	var user domain.User
 	err := r.db.QueryRow(ctx, getUserByPhoneQuery, phone).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.Name, &user.Email, &user.Phone, &user.IsActive)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, dberror.ErrNoRows
-		}
-		return nil, err
+		return nil, handleError(err)
 	}
 	return &user, nil
 }
 
 func (r *UserRepository) Update(ctx context.Context, user *domain.User) (*domain.User, error) {
 	if err := r.db.QueryRow(ctx, updateUserQuery, user.Name, user.Email, user.Phone, user.ID).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.Name, &user.Email, &user.Phone, &user.IsActive); err != nil {
-		return nil, err
+		return nil, handleError(err)
 	}
 	return user, nil
 }
@@ -90,7 +82,7 @@ func (r *UserRepository) GetCountByEmail(ctx context.Context, email domain.Email
 	var count int64
 	err := r.db.QueryRow(ctx, getCountByEmailQuery, email).Scan(&count)
 	if err != nil {
-		return 0, err
+		return -1, handleError(err)
 	}
 	return count, nil
 }
@@ -99,7 +91,20 @@ func (r *UserRepository) GetCountByPhone(ctx context.Context, phone domain.Phone
 	var count int64
 	err := r.db.QueryRow(ctx, getCountByPhoneQuery, phone).Scan(&count)
 	if err != nil {
-		return 0, err
+		return -1, handleError(err)
 	}
 	return count, nil
+}
+
+func handleError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		switch pgErr.ConstraintName {
+		case "udx_users_email":
+			return fmt.Errorf("%w: %s", dberror.ErrDuplicateKey, "email already exist")
+		case "udx_users_phone":
+			return fmt.Errorf("%w: %s", dberror.ErrDuplicateKey, "phone already exist")
+		}
+	}
+	return err
 }
