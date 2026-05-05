@@ -6,4 +6,5 @@ const (
 	ErrorCodeNone ErrorCode = iota
 	ErrorCodeInvalidID
 	ErrorCodeResourceNotFound
+	ErrorCodeResourceAlreadyExists
 )
