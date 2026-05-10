@@ -3,10 +3,10 @@ package infrastructure
 import (
 	"context"
 	"errors"
-	"fmt"
 
-	"github.com/DimKa163/goseller/internal/dberror"
+	"github.com/DimKa163/goseller/internal/shared"
 	"github.com/DimKa163/goseller/internal/user/domain"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -43,6 +43,9 @@ func (r *UserRepository) GetByID(ctx context.Context, id domain.UserID) (*domain
 	var user domain.User
 	err := r.db.QueryRow(ctx, getUserByIDQuery, id).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.Name, &user.Email, &user.Phone, &user.IsActive)
 	if err != nil {
+		if errors.Is(pgx.ErrNoRows, err) {
+			return nil, domain.NewUserNotFoundError(id, err)
+		}
 		return nil, handleError(err)
 	}
 	return &user, nil
@@ -101,9 +104,15 @@ func handleError(err error) error {
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		switch pgErr.ConstraintName {
 		case "udx_users_email":
-			return fmt.Errorf("%w: %s", dberror.ErrDuplicateKey, "email already exist")
+			return domain.NewUserAlreadyExistError("email", pgErr, &shared.ErrorDetail{
+				Field:   pgErr.ColumnName,
+				Message: "email already exist",
+			})
 		case "udx_users_phone":
-			return fmt.Errorf("%w: %s", dberror.ErrDuplicateKey, "phone already exist")
+			return domain.NewUserAlreadyExistError("phone", pgErr, &shared.ErrorDetail{
+				Field:   pgErr.ColumnName,
+				Message: "phone already exist",
+			})
 		}
 	}
 	return err

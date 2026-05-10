@@ -1,4 +1,4 @@
-package transport
+package resterror
 
 type ErrorResponse struct {
 	Error *Error `json:"error"`
@@ -11,6 +11,7 @@ type Error struct {
 }
 
 type ErrorDetail struct {
-	Field   string `json:"field"`
+	Field   string `json:"field,omitempty"`
 	Message string `json:"message"`
+	Value   any    `json:"value,omitempty"`
 }

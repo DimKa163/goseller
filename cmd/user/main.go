@@ -11,7 +11,7 @@ import (
 
 	"github.com/DimKa163/goseller/internal/configuration"
 	"github.com/DimKa163/goseller/internal/middleware"
-	"github.com/DimKa163/goseller/internal/transport"
+	"github.com/DimKa163/goseller/internal/shared/rest"
 	"github.com/DimKa163/goseller/internal/user/infrastructure"
 	userinterfaces "github.com/DimKa163/goseller/internal/user/interface"
 	"github.com/DimKa163/goseller/internal/user/usecase"
@@ -92,7 +92,7 @@ func healthCheck(router *gin.Engine, db *pgxpool.Pool) {
 	})
 }
 
-func mapControllers(router *gin.Engine, controllers ...transport.Controller) {
+func mapControllers(router *gin.Engine, controllers ...rest.Controller) {
 	for _, controller := range controllers {
 		controller.Map(router)
 	}

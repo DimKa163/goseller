@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/DimKa163/goseller/internal/dberror"
+	"github.com/DimKa163/goseller/internal/shared"
 	"github.com/DimKa163/goseller/internal/user/domain"
 	"github.com/DimKa163/goseller/internal/user/mocks"
 	"github.com/golang/mock/gomock"
@@ -151,8 +152,8 @@ func TestUpdateShouldReturnErrorIfUserNotFound(t *testing.T) {
 	sut := NewUser(mockRepo, logger)
 
 	r, err := sut.Update(ctx, id, req)
-
-	assert.ErrorIs(t, err, domain.ErrUserNotFound)
+	var usErr shared.SellerError
+	assert.ErrorAs(t, err, &usErr)
 	assert.Nil(t, r)
 }
 
@@ -258,6 +259,6 @@ func TestDeleteShouldReturnErrorIfUserNotFound(t *testing.T) {
 	sut := NewUser(mockRepo, logger)
 
 	err := sut.Delete(ctx, id)
-
-	assert.ErrorIs(t, err, domain.ErrUserNotFound)
+	var usErr shared.SellerError
+	assert.ErrorAs(t, err, &usErr)
 }

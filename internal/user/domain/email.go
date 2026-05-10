@@ -31,9 +31,6 @@ func (e *Email) UnmarshalJSON(data []byte) error {
 	}
 
 	email := Email(value)
-	if err := email.Validate(); err != nil {
-		return err
-	}
 
 	*e = email
 	return nil

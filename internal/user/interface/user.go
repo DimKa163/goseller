@@ -4,12 +4,13 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/DimKa163/goseller/internal/dberror"
 	"github.com/DimKa163/goseller/internal/shared"
-	"github.com/DimKa163/goseller/internal/transport"
+	"github.com/DimKa163/goseller/internal/shared/resterror"
 	"github.com/DimKa163/goseller/internal/user/domain"
 	"github.com/DimKa163/goseller/internal/user/usecase"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
 )
 
@@ -30,6 +31,17 @@ func (c *UserController) Map(router *gin.Engine) {
 	router.POST("/user", c.CreateUser)
 	router.PUT("/user/:id", c.UpdateUser)
 	router.DELETE("/user/:id", c.DeleteUser)
+
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		_ = v.RegisterValidation("seller_email", func(fl validator.FieldLevel) bool {
+			email := domain.Email(fl.Field().String())
+			return email.Validate() == nil
+		})
+		_ = v.RegisterValidation("phone", func(fl validator.FieldLevel) bool {
+			phone := domain.Phone(fl.Field().String())
+			return phone.Validate() == nil
+		})
+	}
 }
 
 func (c *UserController) GetUser(ctx *gin.Context) {
@@ -39,7 +51,7 @@ func (c *UserController) GetUser(ctx *gin.Context) {
 		c.handleError(ctx, err)
 		return
 	}
-	user, err := c.app.GetByID(ctx, userId)
+	user, err := c.app.GetByID(ctx.Request.Context(), userId)
 	if err != nil {
 		c.handleError(ctx, err)
 		return
@@ -53,7 +65,7 @@ func (c *UserController) CreateUser(ctx *gin.Context) {
 		c.handleError(ctx, err)
 		return
 	}
-	id, err := c.app.Create(ctx, &req)
+	id, err := c.app.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		c.handleError(ctx, err)
 		return
@@ -76,7 +88,7 @@ func (c *UserController) UpdateUser(ctx *gin.Context) {
 		c.handleError(ctx, err)
 		return
 	}
-	us, err := c.app.Update(ctx, userID, &req)
+	us, err := c.app.Update(ctx.Request.Context(), userID, &req)
 	if err != nil {
 		c.handleError(ctx, err)
 		return
@@ -91,7 +103,7 @@ func (c *UserController) DeleteUser(ctx *gin.Context) {
 		c.handleError(ctx, err)
 		return
 	}
-	err = c.app.Delete(ctx, userId)
+	err = c.app.Delete(ctx.Request.Context(), userId)
 	if err != nil {
 		c.handleError(ctx, err)
 		return
@@ -100,10 +112,58 @@ func (c *UserController) DeleteUser(ctx *gin.Context) {
 }
 
 func (c *UserController) handleError(ctx *gin.Context, err error) {
+	var validationErrors validator.ValidationErrors
+	if errors.As(err, &validationErrors) {
+		details := make([]*resterror.ErrorDetail, len(validationErrors))
+		for i, fieldErr := range validationErrors {
+			switch fieldErr.Tag() {
+			case "required":
+				details[i] = &resterror.ErrorDetail{
+					Field:   fieldErr.Field(),
+					Message: "required",
+				}
+			case "seller_email":
+				details[i] = &resterror.ErrorDetail{
+					Field:   fieldErr.Field(),
+					Message: "invalid format",
+					Value:   fieldErr.Value(),
+				}
+			case "phone":
+				details[i] = &resterror.ErrorDetail{
+					Field:   fieldErr.Field(),
+					Message: "invalid format",
+					Value:   fieldErr.Value(),
+				}
+			default:
+				continue
+			}
+		}
+		ctx.JSON(http.StatusBadRequest, &resterror.ErrorResponse{Error: &resterror.Error{
+			Message: "invalid request",
+			Details: details,
+			Code:    int(shared.ErrorCodeBadInputData),
+		}})
+		return
+	}
+	var appErr shared.SellerError
+	if errors.As(err, &appErr) {
+		details := make([]*resterror.ErrorDetail, len(appErr.Details()))
+		for i, d := range appErr.Details() {
+			details[i] = &resterror.ErrorDetail{
+				Message: d.Message,
+			}
+		}
+		ctx.JSON(shared.ErrorCodeToHttpStatusCode(appErr.GetCode()), &resterror.ErrorResponse{Error: &resterror.Error{
+			Message: appErr.Error(),
+			Code:    int(appErr.GetCode()),
+			Details: details,
+		}})
+		return
+	}
 	if errors.Is(err, domain.ErrInvalidUserID) {
-		ctx.JSON(http.StatusBadRequest, &transport.ErrorResponse{Error: &transport.Error{
+		ctx.JSON(http.StatusBadRequest, &resterror.ErrorResponse{Error: &resterror.Error{
 			Message: err.Error(),
-			Details: []*transport.ErrorDetail{
+			Details: []*resterror.ErrorDetail{
 				{
 					Field:   "id",
 					Message: "Invalid user ID format",
@@ -113,51 +173,10 @@ func (c *UserController) handleError(ctx *gin.Context, err error) {
 		}})
 		return
 	}
-	if errors.Is(err, domain.ErrInvalidEmail) {
-		ctx.JSON(http.StatusBadRequest, &transport.ErrorResponse{Error: &transport.Error{
-			Message: err.Error(),
-			Details: []*transport.ErrorDetail{
-				{
-					Field:   "email",
-					Message: "Invalid email format",
-				},
-			},
-			Code: int(shared.ErrorCodeInvalidID),
-		}})
-		return
-	}
-	if errors.Is(err, domain.ErrInvalidPhone) {
-		ctx.JSON(http.StatusBadRequest, &transport.ErrorResponse{Error: &transport.Error{
-			Message: err.Error(),
-			Details: []*transport.ErrorDetail{
-				{
-					Field:   "phone",
-					Message: "Invalid phone format",
-				},
-			},
-			Code: int(shared.ErrorCodeInvalidID),
-		}})
-		return
-	}
-	if errors.Is(err, domain.ErrUserNotFound) {
-		ctx.JSON(http.StatusNotFound, &transport.ErrorResponse{Error: &transport.Error{
-			Message: err.Error(),
-			Details: []*transport.ErrorDetail{},
-			Code:    int(shared.ErrorCodeResourceNotFound),
-		}})
-		return
-	}
-	if errors.Is(err, dberror.ErrDuplicateKey) {
-		ctx.JSON(http.StatusConflict, &transport.ErrorResponse{Error: &transport.Error{
-			Message: err.Error(),
-			Details: []*transport.ErrorDetail{},
-			Code:    int(shared.ErrorCodeResourceAlreadyExists),
-		}})
-		return
-	}
-	ctx.JSON(400, &transport.ErrorResponse{
-		Error: &transport.Error{
-			Message: "Invalid request body",
-			Details: []*transport.ErrorDetail{}},
+	ctx.JSON(http.StatusInternalServerError, &resterror.ErrorResponse{
+		Error: &resterror.Error{
+			Message: "internal server error",
+			Code:    int(shared.ErrorCodeInternalServerError),
+		},
 	})
 }
