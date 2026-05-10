@@ -2,9 +2,7 @@ package usecase
 
 import (
 	"context"
-	"errors"
 
-	"github.com/DimKa163/goseller/internal/dberror"
 	"github.com/DimKa163/goseller/internal/shared"
 	"github.com/DimKa163/goseller/internal/shared/sellerlog"
 	"github.com/DimKa163/goseller/internal/user/domain"
@@ -53,7 +51,7 @@ func (r *UpdateUserRequest) Validate() error {
 	}
 	if err := r.Phone.Validate(); err != nil {
 		details = append(details, &shared.ErrorDetail{
-			Field:   "Email",
+			Field:   "Phone",
 			Message: err.Error(),
 		})
 	}
@@ -92,7 +90,7 @@ func (u *User) Create(ctx context.Context, req *CreateUserRequest) (domain.UserI
 	usID, err = u.userRepository.Create(ctx, user)
 	if err != nil {
 		log := sellerlog.FromContext(ctx, u.logger)
-		log.Sugar().Errorf("error occured: %w", err)
+		log.Error("error occurred during creating user", zap.Error(err))
 		return usID, err
 	}
 
@@ -104,9 +102,8 @@ func (u *User) Update(ctx context.Context, id domain.UserID, req *UpdateUserRequ
 	var err error
 	user, err = u.userRepository.GetByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, dberror.ErrNoRows) {
-			return nil, domain.NewUserNotFoundError(id, err)
-		}
+		log := sellerlog.FromContext(ctx, u.logger)
+		log.Error("error occurred during updating user", zap.Error(err))
 		return nil, err
 	}
 	user.Update(req.Name, req.Email, req.Phone)
@@ -121,9 +118,8 @@ func (u *User) Delete(ctx context.Context, id domain.UserID) error {
 	var err error
 	user, err = u.userRepository.GetByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, dberror.ErrNoRows) {
-			return domain.NewUserNotFoundError(id, err)
-		}
+		log := sellerlog.FromContext(ctx, u.logger)
+		log.Error("error occurred during deleting user", zap.Error(err))
 		return err
 	}
 	user.Deactivate()

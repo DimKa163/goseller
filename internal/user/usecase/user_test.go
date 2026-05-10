@@ -10,6 +10,8 @@ import (
 	"github.com/DimKa163/goseller/internal/user/domain"
 	"github.com/DimKa163/goseller/internal/user/mocks"
 	"github.com/golang/mock/gomock"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -139,7 +141,7 @@ func TestUpdateShouldReturnErrorIfUserNotFound(t *testing.T) {
 		Phone: phone,
 	}
 	mockRepo := mocks.NewMockUserRepository(ctrl)
-	mockRepo.EXPECT().GetByID(ctx, id).Return(nil, dberror.ErrNoRows).Times(1)
+	mockRepo.EXPECT().GetByID(ctx, id).Return(nil, domain.NewUserNotFoundError(id, pgx.ErrNoRows)).Times(1)
 	mockRepo.EXPECT().Update(ctx, gomock.Any()).Return(&domain.User{
 		ID:        id,
 		CreatedAt: time.Now().Add(time.Duration(-50 * time.Hour)),
@@ -180,13 +182,18 @@ func TestUpdateShouldReturnErrorIfEmailAlreadyExists(t *testing.T) {
 	}
 	mockRepo := mocks.NewMockUserRepository(ctrl)
 	mockRepo.EXPECT().GetByID(ctx, id).Return(user, nil).Times(1)
-	mockRepo.EXPECT().Update(ctx, gomock.Any()).Return(nil, dberror.ErrDuplicateKey).Times(1)
+	var pgErr pgconn.PgError
+	mockRepo.EXPECT().Update(ctx, gomock.Any()).Return(nil, domain.NewUserAlreadyExistError("email", &pgErr, &shared.ErrorDetail{
+		Field:   pgErr.ColumnName,
+		Message: "email already exist",
+	})).Times(1)
 	logger := zap.NewNop()
 	sut := NewUser(mockRepo, logger)
 
 	r, err := sut.Update(ctx, id, req)
 
-	assert.ErrorIs(t, err, dberror.ErrDuplicateKey)
+	var usErr shared.SellerError
+	assert.ErrorAs(t, err, &usErr)
 	assert.Nil(t, r)
 }
 
@@ -213,13 +220,18 @@ func TestUpdateShouldReturnErrorIfPhoneAlreadyExists(t *testing.T) {
 	}
 	mockRepo := mocks.NewMockUserRepository(ctrl)
 	mockRepo.EXPECT().GetByID(ctx, id).Return(user, nil).Times(1)
-	mockRepo.EXPECT().Update(ctx, gomock.Any()).Return(nil, dberror.ErrDuplicateKey).Times(1)
+	var pgErr pgconn.PgError
+	mockRepo.EXPECT().Update(ctx, gomock.Any()).Return(nil, domain.NewUserAlreadyExistError("phone", &pgErr, &shared.ErrorDetail{
+		Field:   pgErr.ColumnName,
+		Message: "phone already exist",
+	})).Times(1)
 	logger := zap.NewNop()
 	sut := NewUser(mockRepo, logger)
 
 	r, err := sut.Update(ctx, id, req)
 
-	assert.ErrorIs(t, err, dberror.ErrDuplicateKey)
+	var usErr shared.SellerError
+	assert.ErrorAs(t, err, &usErr)
 	assert.Nil(t, r)
 }
 
@@ -253,7 +265,7 @@ func TestDeleteShouldReturnErrorIfUserNotFound(t *testing.T) {
 	defer ctrl.Finish()
 	id := domain.UserID(1)
 	mockRepo := mocks.NewMockUserRepository(ctrl)
-	mockRepo.EXPECT().GetByID(ctx, id).Return(nil, dberror.ErrNoRows).Times(1)
+	mockRepo.EXPECT().GetByID(ctx, id).Return(nil, domain.NewUserNotFoundError(id, pgx.ErrNoRows)).Times(1)
 	mockRepo.EXPECT().Delete(ctx, id).Return(nil).Times(0)
 	logger := zap.NewNop()
 	sut := NewUser(mockRepo, logger)

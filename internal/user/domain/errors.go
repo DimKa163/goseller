@@ -87,7 +87,7 @@ func (i *InvalidInputDataError) GetCode() shared.ErrorCode {
 
 // Unwrap implements [shared.SellerError].
 func (i *InvalidInputDataError) Unwrap() error {
-	return i
+	return nil
 }
 
 func NewInvalidInputDataError(message string, details ...*shared.ErrorDetail) shared.SellerError {

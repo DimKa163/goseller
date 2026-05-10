@@ -35,6 +35,6 @@ func ErrorCodeToHttpStatusCode(code ErrorCode) int {
 	case ErrorCodeResourceNotFound:
 		return http.StatusNotFound
 	default:
-		return http.StatusOK
+		return http.StatusInternalServerError
 	}
 }
