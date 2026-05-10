@@ -31,9 +31,6 @@ func (p *Phone) UnmarshalJSON(data []byte) error {
 	}
 
 	phone := Phone(value)
-	if err := phone.Validate(); err != nil {
-		return err
-	}
 
 	*p = phone
 	return nil
