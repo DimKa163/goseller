@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/DimKa163/goseller/internal/dberror"
 	"github.com/DimKa163/goseller/internal/shared"
 	"github.com/DimKa163/goseller/internal/user/domain"
 	"github.com/jackc/pgx/v5"
@@ -13,7 +14,7 @@ import (
 
 const (
 	createUserQuery      = `INSERT INTO users (name, email, phone) VALUES ($1, $2, $3) RETURNING id`
-	updateUserQuery      = `UPDATE users SET name = $1, email = $2, phone = $3, updated_at = now() WHERE id = $4 RETURNING id, created_at, updated_at, name, email, phone, is_active`
+	updateUserQuery      = `UPDATE users SET name = $1, email = $2, phone = $3, updated_at = now() WHERE id = $4 and is_active = true RETURNING id, created_at, updated_at, name, email, phone, is_active`
 	getUserByIDQuery     = `SELECT id, created_at, updated_at, name, email, phone, is_active FROM public.users WHERE id = $1 and is_active = true`
 	getUserByEmailQuery  = `SELECT id, created_at, updated_at, name, email, phone, is_active FROM public.users WHERE email = $1 and is_active = true`
 	getUserByPhoneQuery  = `SELECT id, created_at, updated_at, name, email, phone, is_active FROM public.users WHERE phone = $1 and is_active = true`
@@ -43,7 +44,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id domain.UserID) (*domain
 	var user domain.User
 	err := r.db.QueryRow(ctx, getUserByIDQuery, id).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.Name, &user.Email, &user.Phone, &user.IsActive)
 	if err != nil {
-		if errors.Is(pgx.ErrNoRows, err) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.NewUserNotFoundError(id, err)
 		}
 		return nil, handleError(err)
@@ -77,7 +78,14 @@ func (r *UserRepository) Update(ctx context.Context, user *domain.User) (*domain
 }
 
 func (r *UserRepository) Delete(ctx context.Context, id domain.UserID) error {
-	_, err := r.db.Exec(ctx, deactivateUserQuery, id)
+	tag, err := r.db.Exec(ctx, deactivateUserQuery, id)
+	if err != nil {
+		return handleError(err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return dberror.ErrNoRows
+	}
 	return err
 }
 

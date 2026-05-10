@@ -25,7 +25,9 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	var userConfig configuration.UserConfiguration
-	env.Parse(&userConfig)
+	if err := env.Parse(&userConfig); err != nil {
+		panic(err)
+	}
 	fmt.Printf("Loaded configuration: %+v\n", userConfig)
 	log, err := createLogger(userConfig)
 	if err != nil {

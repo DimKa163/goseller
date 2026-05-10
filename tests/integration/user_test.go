@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -27,8 +28,7 @@ import (
 
 func TestUserApi_CreateShouldBeSuccess(t *testing.T) {
 	ctx := context.Background()
-	addr := ":8081"
-	container, db, err := run(ctx, addr, func(pool *pgxpool.Pool) error {
+	container, srv, db, err := run(ctx, func(pool *pgxpool.Pool) error {
 		// Здесь можно выполнить начальную настройку базы данных, если это необходимо
 		return nil
 	})
@@ -40,7 +40,7 @@ func TestUserApi_CreateShouldBeSuccess(t *testing.T) {
 			t.Fatalf("Failed to terminate container: %v", err)
 		}
 	}()
-
+	defer srv.Close()
 	defer db.Close()
 	rep := infrastructure.NewUserRepository(db)
 	req := &usecase.CreateUserRequest{
@@ -56,7 +56,7 @@ func TestUserApi_CreateShouldBeSuccess(t *testing.T) {
 		t.Fatalf("Failed to marshal request body: %v", err)
 	}
 	buffer := bytes.NewBuffer(data)
-	requestMessage, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("http://localhost%s/user", addr), buffer)
+	requestMessage, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/user", srv.URL), buffer)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
@@ -88,8 +88,7 @@ func TestUserApi_CreateShouldBeSuccess(t *testing.T) {
 
 func TestUserAPI_CreateShouldBeFailed(t *testing.T) {
 	ctx := context.Background()
-	addr := ":8082"
-	container, db, err := run(ctx, addr, func(pool *pgxpool.Pool) error {
+	container, srv, db, err := run(ctx, func(pool *pgxpool.Pool) error {
 		// Здесь можно выполнить начальную настройку базы данных, если это необходимо
 		return nil
 	})
@@ -101,7 +100,7 @@ func TestUserAPI_CreateShouldBeFailed(t *testing.T) {
 			t.Fatalf("Failed to terminate container: %v", err)
 		}
 	}()
-
+	defer srv.Close()
 	defer db.Close()
 	rep := infrastructure.NewUserRepository(db)
 	cases := []struct {
@@ -267,7 +266,7 @@ func TestUserAPI_CreateShouldBeFailed(t *testing.T) {
 				t.Fatalf("Failed to marshal request body: %v", err)
 			}
 			buffer := bytes.NewBuffer(data)
-			requestMessage, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("http://localhost%s/user", addr), buffer)
+			requestMessage, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/user", srv.URL), buffer)
 			if err != nil {
 				t.Fatalf("Failed to create request: %v", err)
 			}
@@ -295,9 +294,9 @@ func TestUserAPI_CreateShouldBeFailed(t *testing.T) {
 	}
 }
 
-func run(ctx context.Context, addr string, beFn func(pool *pgxpool.Pool) error) (testcontainers.Container, *pgxpool.Pool, error) {
+func run(ctx context.Context, beFn func(pool *pgxpool.Pool) error) (testcontainers.Container, *httptest.Server, *pgxpool.Pool, error) {
 	req := testcontainers.ContainerRequest{
-		Image:        "postgres:latest",
+		Image:        "postgres:16-alpine",
 		ExposedPorts: []string{"5432/tcp"},
 		Env: map[string]string{
 			"POSTGRES_USER":     "test",
@@ -312,44 +311,39 @@ func run(ctx context.Context, addr string, beFn func(pool *pgxpool.Pool) error) 
 		Started:          true,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	host, err := container.Host(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	port, err := container.MappedPort(ctx, "5432")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	databaseURL := fmt.Sprintf("postgres://test:test@%s:%s/test?sslmode=disable", host, port.Port())
 
 	db, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if err := db.Ping(ctx); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if err := infrastructure.Migrate(db, "../../internal/user/migrations"); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if err := beFn(db); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	log, err := zap.NewDevelopment()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	router := gin.New()
 	router.Use(middleware.LoggingMiddleware(log))
 	controller := userinterfaces.NewUserController(log, usecase.NewUser(infrastructure.NewUserRepository(db), log))
 	controller.Map(router)
-	go func() {
-		if err := router.Run(addr); err != nil {
-			log.Fatal("Failed to run server", zap.Error(err))
-		}
-	}()
-	return container, db, nil
+	return container, httptest.NewServer(router), db, nil
 }
