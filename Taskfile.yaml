@@ -38,4 +38,4 @@ tasks:
   user-migrate:
     desc: "Run database migrations for user service"
     cmds:
-      - migrate create -ext sql -dir ./internal/user/migrations {{.CLI_ARGS}}
+      - migrate create -ext sql {{.CLI_ARGS}}
