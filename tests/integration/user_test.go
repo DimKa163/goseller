@@ -28,7 +28,7 @@ import (
 
 func TestUserApi_CreateShouldBeSuccess(t *testing.T) {
 	ctx := context.Background()
-	container, srv, db, err := run(ctx, func(pool *pgxpool.Pool) error {
+	container, srv, db, err := run_users(ctx, func(pool *pgxpool.Pool) error {
 		// Здесь можно выполнить начальную настройку базы данных, если это необходимо
 		return nil
 	})
@@ -88,7 +88,7 @@ func TestUserApi_CreateShouldBeSuccess(t *testing.T) {
 
 func TestUserAPI_CreateShouldBeFailed(t *testing.T) {
 	ctx := context.Background()
-	container, srv, db, err := run(ctx, func(pool *pgxpool.Pool) error {
+	container, srv, db, err := run_users(ctx, func(pool *pgxpool.Pool) error {
 		// Здесь можно выполнить начальную настройку базы данных, если это необходимо
 		return nil
 	})
@@ -294,7 +294,7 @@ func TestUserAPI_CreateShouldBeFailed(t *testing.T) {
 	}
 }
 
-func run(ctx context.Context, beFn func(pool *pgxpool.Pool) error) (testcontainers.Container, *httptest.Server, *pgxpool.Pool, error) {
+func run_users(ctx context.Context, beFn func(pool *pgxpool.Pool) error) (testcontainers.Container, *httptest.Server, *pgxpool.Pool, error) {
 	req := testcontainers.ContainerRequest{
 		Image:        "postgres:16-alpine",
 		ExposedPorts: []string{"5432/tcp"},

@@ -61,7 +61,9 @@ func (c *CategoryController) Create(ctx *gin.Context) {
 		return
 	}
 	ctx.Header("Location", "/category/"+id.String())
-	ctx.Status(http.StatusCreated)
+	ctx.JSON(http.StatusCreated, gin.H{
+		"id": id,
+	})
 }
 
 func (c *CategoryController) Update(ctx *gin.Context) {
@@ -76,12 +78,12 @@ func (c *CategoryController) Update(ctx *gin.Context) {
 		c.handleError(ctx, err)
 		return
 	}
-	_, err = c.app.Update(ctx.Request.Context(), categoryId, &request)
+	category, err := c.app.Update(ctx.Request.Context(), categoryId, &request)
 	if err != nil {
 		c.handleError(ctx, err)
 		return
 	}
-	ctx.Status(http.StatusNoContent)
+	ctx.JSON(http.StatusOK, category)
 }
 
 func (c *CategoryController) Delete(ctx *gin.Context) {

@@ -1,6 +1,10 @@
 package domain
 
-import "github.com/DimKa163/goseller/internal/shared"
+import (
+	"fmt"
+
+	"github.com/DimKa163/goseller/internal/shared"
+)
 
 type CategoryIDInvalidError struct {
 	value    string
@@ -14,7 +18,7 @@ func (c CategoryIDInvalidError) Details() []*shared.ErrorDetail {
 
 // Error implements [shared.SellerError].
 func (c CategoryIDInvalidError) Error() string {
-	return "invalid category ID"
+	return fmt.Sprintf("invalid id %s", c.value)
 }
 
 // GetCode implements [shared.SellerError].
