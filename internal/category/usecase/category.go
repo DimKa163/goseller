@@ -66,7 +66,7 @@ func (s *CategoryAppService) Update(ctx context.Context, id domain.CategoryID, r
 	if err != nil {
 		var dbErr *dberror.ResourceAlreadyExistError
 		if errors.As(err, &dbErr) {
-			return nil, newCategoryAlreadyExistError(request.Name, err)
+			return nil, newCategoryAlreadyExistError(request.Name, dbErr)
 		}
 		return nil, err
 	}

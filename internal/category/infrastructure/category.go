@@ -65,8 +65,14 @@ func (r *CategoryRepository) Update(ctx context.Context, category *domain.Catego
 }
 
 func (r *CategoryRepository) Deactivate(ctx context.Context, id domain.CategoryID) error {
-	_, err := r.db.Exec(ctx, deactivateQuery, id)
-	return handleError(err)
+	tg, err := r.db.Exec(ctx, deactivateQuery, id)
+	if err != nil {
+		return handleError(err)
+	}
+	if tg.RowsAffected() == 0 {
+		return dberror.ErrNoRows
+	}
+	return nil
 }
 
 func handleError(err error) error {
