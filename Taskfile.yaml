@@ -38,4 +38,20 @@ tasks:
   user-migrate:
     desc: "Run database migrations for user service"
     cmds:
-      - migrate create -ext sql -dir ./internal/user/migrations {{.CLI_ARGS}}
+      - migrate create -ext sql {{.CLI_ARGS}}
+
+  category-build:
+    desc: "Build the category service"
+    cmds:
+      - go build -o build/category-app cmd/category/main.go
+
+  category-run:
+    desc: "Run the category service"
+    cmds:
+      - go run cmd/category/main.go
+
+  category-mocks:
+    desc: "Generate mocks for category repository"
+    cmds:
+      - mockgen -source=internal/category/domain/category.go
+        -destination=internal/category/mocks/repository_mock.go -package=mocks
